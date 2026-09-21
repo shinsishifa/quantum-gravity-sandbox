@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Quantum Gravity Sandbox</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      background-color: #020208;
+      color: #00f0ff;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      user-select: none;
+    }
+    .main-container {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+    }
+    canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+      background: radial-gradient(circle at center, #050515 0%, #000004 100%);
+      touch-action: none;
+    }
+    .control-panel {
+      position: absolute;
+      top: 15px;
+      left: 15px;
+      width: 280px;
+      background: rgba(8, 12, 24, 0.85);
+      border: 1px solid #00f0ff;
+      border-radius: 10px;
+      padding: 16px;
+      box-shadow: 0 0 15px rgba(0, 240, 255, 0.2);
+      backdrop-filter: blur(8px);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      font-size: 0.85rem;
+      z-index: 10;
+    }
+    .control-panel h2 {
+      font-size: 1.1rem;
+      letter-spacing: 1px;
+      color: #00f0ff;
+      text-shadow: 0 0 8px #00f0ff;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .control-group label {
+      display: flex;
+      justify-content: space-between;
+      color: #aaa;
+    }
+    .control-group label span {
+      color: #ff0055;
+      font-weight: bold;
+    }
+    input[type="range"] {
+      appearance: none;
+      width: 100%;
+      height: 4px;
+      background: #1a1a3a;
+      border-radius: 2px;
+      outline: none;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #00f0ff;
+      box-shadow: 0 0 8px #00f0ff;
+      cursor: pointer;
+    }
+    .btn-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 4px;
+    }
+    .btn {
+      background: transparent;
+      color: #00f0ff;
+      border: 1px solid #00f0ff;
+      padding: 8px 10px;
+      font-size: 0.75rem;
+      font-weight: bold;
+      border-radius: 6px;
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      transition: all 0.2s ease;
+    }
+    .btn:hover, .btn.active {
+      background: #00f0ff;
+      color: #020208;
+      box-shadow: 0 0 10px rgba(0, 240, 255, 0.6);
+    }
+    .btn-danger {
+      color: #ff0055;
+      border-color: #ff0055;
+    }
+    .btn-danger:hover {
+      background: #ff0055;
+      color: #fff;
+      box-shadow: 0 0 10px rgba(255, 0, 85, 0.6);
+    }
+    .hud-stats {
+      position: absolute;
+      bottom: 15px;
+      right: 15px;
+      background: rgba(8, 12, 24, 0.8);
+      border: 1px solid rgba(0, 240, 255, 0.4);
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-family: monospace;
+      font-size: 0.8rem;
+      color: #00f0ff;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="main-container">
+    <div class="control-panel">
+      <h2>Quantum Gravity</h2>
+      
+      <div class="control-group">
+        <label>Tool Mode</label>
+        <div class="btn-grid">
+          <button id="modeAttract" class="btn active" onclick="setMode('attract')">Attractor</button>
+          <button id="modeRepel" class="btn" onclick="setMode('repel')">Repulsor</button>
+        </div>
+      </div>
+
+      <div class="control-group">
+        <label>Presets</label>
+        <div class="btn-grid">
+          <button class="btn" onclick="applyPreset('orbit')">Galaxy</button>
+          <button class="btn" onclick="applyPreset('supernova')">Supernova</button>
+        </div>
+      </div>
+
+      <div class="control-group">
+        <label>Gravity Strength <span id="gravVal">1.0</span></label>
+        <input type="range" id="gravSlider" min="0.1" max="3" step="0.1" value="1.0" />
+      </div>
+
+      <div class="control-group">
+        <label>Damping (Friction) <span id="dampVal">0.99</span></label>
+        <input type="range" id="dampSlider" min="0.95" max="1.0" step="0.005" value="0.99" />
+      </div>
+
+      <div class="control-group">
+        <label>Particle Count <span id="countVal">1500</span></label>
+        <input type="range" id="countSlider" min="300" max="3000" step="100" value="1500" />
+      </div>
+
+      <button class="btn btn-danger" onclick="clearAnchors()">Clear Anchors</button>
+    </div>
+
+    <canvas id="simCanvas"></canvas>
+
+    <div class="hud-stats">
+      Particles: <span id="particleCount">0</span> | Anchors: <span id="anchorCount">0</span>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('simCanvas');
+    const ctx = canvas.getContext('2d');
+
+    const gravSlider = document.getElementById('gravSlider');
+    const dampSlider = document.getElementById('dampSlider');
+    const countSlider = document.getElementById('countSlider');
+    
+    const particleCountDisplay = document.getElementById('particleCount');
+    const anchorCountDisplay = document.getElementById('anchorCount');
+
+    let width, height;
+    let particles = [];
+    let anchors = [];
+    let currentMode = 'attract';
+
+    let gravityMult = 1.0;
+    let damping = 0.99;
+    let targetParticleCount = 1500;
+
+    function resize() {
+      width = canvas.width = window.innerWidth;
+      height = canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    class Particle {
+      constructor(x, y, vx, vy) {
+        this.x = x || Math.random() * width;
+        this.y = y || Math.random() * height;
+        this.vx = vx || (Math.random() - 0.5) * 2;
+        this.vy = vy || (Math.random() - 0.5) * 2;
+        this.radius = 1.5;
+        this.hue = Math.random() * 60 + 180; // Blue to Cyan range
+      }
+
+      update() {
+        // Apply forces from anchors
+        for (let a of anchors) {
+          let dx = a.x - this.x;
+          let dy = a.y - this.y;
+          let distSq = dx * dx + dy * dy + 400; // Softening parameter
+          let force = (a.type === 'attract' ? 1 : -1) * (1500 * gravityMult) / distSq;
+          let dist = Math.sqrt(distSq);
+
+          this.vx += (dx / dist) * force;
+          this.vy += (dy / dist) * force;
+        }
+
+        this.vx *= damping;
+        this.vy *= damping;
+
+        this.x += this.vx;
+        this.y += this.vy;
+
+        // Screen wrap
+        if (this.x < 0) this.x = width;
+        if (this.x > width) this.x = 0;
+        if (this.y < 0) this.y = height;
+        if (this.y > height) this.y = 0;
+      }
+
+      draw() {
+        let speed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
+        let dynamicHue = this.hue + speed * 15;
+        ctx.fillStyle = `hsl(${dynamicHue}, 100%, 65%)`;
+        ctx.fillRect(this.x, this.y, this.radius, this.radius);
+      }
+    }
+
+    function syncParticles() {
+      while (particles.length < targetParticleCount) {
+        particles.push(new Particle());
+      }
+      while (particles.length > targetParticleCount) {
+        particles.pop();
+      }
+      particleCountDisplay.innerText = particles.length;
+    }
+
+    function setMode(mode) {
+      currentMode = mode;
+      document.getElementById('modeAttract').classList.toggle('active', mode === 'attract');
+      document.getElementById('modeRepel').classList.toggle('active', mode === 'repel');
+    }
+
+    function clearAnchors() {
+      anchors = [];
+      anchorCountDisplay.innerText = 0;
+    }
+
+    function applyPreset(preset) {
+      clearAnchors();
+      if (preset === 'orbit') {
+        anchors.push({ x: width / 2, y: height / 2, type: 'attract' });
+        particles.forEach(p => {
+          let rx = p.x - width / 2;
+          let ry = p.y - height / 2;
+          p.vx = -ry * 0.015;
+          p.vy = rx * 0.015;
+        });
+      } else if (preset === 'supernova') {
+        anchors.push({ x: width / 2, y: height / 2, type: 'repel' });
+        particles.forEach(p => {
+          p.x = width / 2 + (Math.random() - 0.5) * 20;
+          p.y = height / 2 + (Math.random() - 0.5) * 20;
+          p.vx = (Math.random() - 0.5) * 12;
+          p.vy = (Math.random() - 0.5) * 12;
+        });
+      }
+      anchorCountDisplay.innerText = anchors.length;
+    }
+
+    // Canvas Interactions
+    canvas.addEventListener('pointerdown', (e) => {
+      anchors.push({ x: e.clientX, y: e.clientY, type: currentMode });
+      anchorCountDisplay.innerText = anchors.length;
+    });
+
+    // Control Listeners
+    gravSlider.addEventListener('input', (e) => {
+      gravityMult = parseFloat(e.target.value);
+      document.getElementById('gravVal').innerText = gravityMult.toFixed(1);
+    });
+
+    dampSlider.addEventListener('input', (e) => {
+      damping = parseFloat(e.target.value);
+      document.getElementById('dampVal').innerText = damping.toFixed(3);
+    });
+
+    countSlider.addEventListener('input', (e) => {
+      targetParticleCount = parseInt(e.target.value);
+      document.getElementById('countVal').innerText = targetParticleCount;
+      syncParticles();
+    });
+
+    // Main Simulation Loop
+    function loop() {
+      // Trail fade effect
+      ctx.fillStyle = 'rgba(2, 2, 8, 0.2)';
+      ctx.fillRect(0, 0, width, height);
+
+      // Draw Gravity Anchors
+      for (let a of anchors) {
+        ctx.beginPath();
+        ctx.arc(a.x, a.y, 8, 0, Math.PI * 2);
+        ctx.fillStyle = a.type === 'attract' ? '#00f0ff' : '#ff0055';
+        ctx.shadowBlur = 12;
+        ctx.shadowColor = ctx.fillStyle;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+      }
+
+      // Update Particles
+      for (let p of particles) {
+        p.update();
+        p.draw();
+      }
+
+      requestAnimationFrame(loop);
+    }
+
+    // Initialize
+    syncParticles();
+    applyPreset('orbit');
+    loop();
+  </script>
+</body>
+</html>
