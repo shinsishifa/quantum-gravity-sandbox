@@ -24,5 +24,6 @@ An interactive HTML5 particle simulator. Manipulate dynamic gravitational fields
 3. **Adjust Sliders:** Tweak gravity parameters, friction, and particle density in real time.
 4. **Presets:** Click **Galaxy** to form orbital spirals or **Supernova** to burst particles outward.
 
----
+--view my site
+http://shinsishifa.github.io./quantum-gravity-sandbox/
 
